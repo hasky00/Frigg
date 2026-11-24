@@ -3,7 +3,8 @@
 #
 #   frigg            list the apps in the store
 #   frigg info ID    show one app
-#   frigg install ID install an app (free apps only in this draft)
+#   frigg install ID download an app from its developer and run its installer
+#                    (free apps only in this draft)
 #
 # The catalog is a set of small JSON manifests served by the store site.
 set -euo pipefail
@@ -19,7 +20,7 @@ manifest() { curl -fsSL "$FRIGG_URL/apps/$1.json"; }
 
 case "${1:-list}" in
   list)
-    catalog | jq -r '.[] | "\(.id)\t\(.name)\t\(.tagline // "")"' | column -t -s $'\t'
+    catalog | jq -r '.[] | "\(.id)\t\(.name)\t\(.tagline // "")"' | awk -F'\t' '{ printf "%-14s %-14s %s\n", $1, $2, $3 }'
     ;;
   info)
     [[ -n "${2:-}" ]] || { echo "Usage: frigg info ID" >&2; exit 1; }
@@ -27,8 +28,42 @@ case "${1:-list}" in
     ;;
   install)
     [[ -n "${2:-}" ]] || { echo "Usage: frigg install ID" >&2; exit 1; }
-    echo "Installing is not wired up yet. It arrives with the Wednesday build." >&2
-    exit 1
+    need git
+    app="$(manifest "$2")"
+    name="$(jq -r '.name' <<<"$app")"
+    repo="$(jq -r '.source.repo // empty' <<<"$app")"
+    branch="$(jq -r '.source.branch // empty' <<<"$app")"
+    subdir="$(jq -r '.source.subdir // empty' <<<"$app")"
+    script="$(jq -r '.source.install // "install.sh"' <<<"$app")"
+    price="$(jq -r '.price_sats // 0' <<<"$app")"
+
+    [[ -n "$repo" ]] || { echo "$name has no source to install from yet." >&2; exit 1; }
+    if (( price > 0 )); then
+      echo "$name costs $price sats. Paying from the terminal is not wired up yet." >&2
+      exit 1
+    fi
+
+    dest="${XDG_DATA_HOME:-$HOME/.local/share}/frigg/apps/$2"
+    if [[ -d "$dest/.git" ]]; then
+      echo "Updating $name..."
+      git -C "$dest" pull --ff-only --quiet
+    else
+      echo "Downloading $name from $repo..."
+      mkdir -p "$(dirname "$dest")"
+      git clone --quiet --depth 1 ${branch:+--branch "$branch"} "$repo" "$dest"
+    fi
+
+    installer="$dest/${subdir:+$subdir/}$script"
+    [[ -f "$installer" ]] || { echo "No installer found at $installer" >&2; exit 1; }
+
+    # Frigg does not review code. Say so, and let the buyer look first.
+    echo
+    echo "$name comes straight from its developer. Frigg has not reviewed it."
+    echo "The installer about to run is: $installer"
+    read -r -p "Run it now? [y/N] " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || { echo "Nothing was installed. The files are in $dest if you want to read them."; exit 0; }
+
+    bash "$installer"
     ;;
   *)
     echo "Usage: frigg [list | info ID | install ID]" >&2

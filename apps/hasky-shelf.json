@@ -3,16 +3,24 @@
   "name": "Hasky Shelf",
   "version": null,
   "developer": "Hasky Labs",
-  "tagline": "A bookshelf for the books you write.",
-  "description": "Write your own book and publish it. Keep it on your shelf, share it with one special person, or send it to anyone with a link.",
+  "tagline": "A shelf for the books you write and collect.",
+  "description": "Books stand cover-out in a cabinet lit by a neon tube that takes the color of your Omarchy theme. Write your own book, add the PDFs and EPUBs you already have, and share a book as a single file.",
   "features": [
-    "Write and publish your own book",
-    "Share with one person or with a link"
+    "Write a book: it saves by itself as you go",
+    "Add PDF and EPUB files by dragging them onto the window",
+    "Share a book you wrote as an EPUB any reader opens",
+    "Your books stay in a folder on your own machine"
   ],
-  "built_with": null,
+  "built_with": "Qt 6",
   "hotkey": null,
-  "source": null,
+  "source": {
+    "repo": "https://github.com/hasky00/hasky-shelf",
+    "branch": null,
+    "subdir": null,
+    "install": "install.sh"
+  },
+  "license": "MIT",
   "price_sats": null,
   "lightning_address": null,
-  "status": "listing-draft"
+  "status": "listed"
 }

@@ -305,6 +305,7 @@ footer .wrap { display: grid; gap: 6px; }
     if (app.version) facts.appendChild(el("span", "pill", "v" + app.version));
     if (app.built_with) facts.appendChild(el("span", "pill", app.built_with));
     if (app.hotkey) facts.appendChild(el("span", "pill", app.hotkey));
+    if (app.license) facts.appendChild(el("span", "pill", app.license + " licensed"));
     facts.appendChild(el("span", app.price_sats ? "pill ok" : "pill wait",
       app.price_sats ? app.price_sats.toLocaleString("en-GB") + " sats" : "price not set"));
     box.appendChild(facts);
@@ -322,7 +323,13 @@ footer .wrap { display: grid; gap: 6px; }
     cmd.appendChild(code);
     cmd.appendChild(copy);
     box.appendChild(cmd);
-    box.appendChild(el("p", "note", "The install command is not live yet."));
+    var note = el("p", "note", "Downloads from the developer and runs their installer. Not tested on Omarchy yet. ");
+    if (app.source && app.source.repo) {
+      var link = el("a", null, "Read the source");
+      link.href = app.source.repo + (app.source.branch ? "/tree/" + app.source.branch + (app.source.subdir ? "/" + app.source.subdir : "") : "");
+      note.appendChild(link);
+    }
+    box.appendChild(note);
     return box;
   }
 

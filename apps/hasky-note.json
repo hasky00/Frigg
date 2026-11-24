@@ -13,8 +13,14 @@
   ],
   "built_with": "Rust",
   "hotkey": "Super + Alt + N",
-  "source": null,
+  "source": {
+    "repo": "https://github.com/hasky00/omarchy",
+    "branch": "hasky-note",
+    "subdir": "hasky-note",
+    "install": "install.sh"
+  },
   "price_sats": null,
   "lightning_address": null,
-  "status": "listing-draft"
+  "status": "listed",
+  "license": null
 }
