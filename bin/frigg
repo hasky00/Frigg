@@ -71,10 +71,18 @@ pay() {
 
   local sep="?"; [[ "$callback" == *\?* ]] && sep="&"
   local reply invoice verify
-  reply="$(curl -fsSL "${callback}${sep}amount=${msats}")" || die "$address did not return an invoice."
+  # No -f here: when a wallet refuses, its answer says why, and the buyer should see it.
+  reply="$(curl -sSL "${callback}${sep}amount=${msats}")" || die "Could not reach $address to get an invoice."
   invoice="$(jq -r '.pr // empty' <<<"$reply")"
   verify="$(jq -r '.verify // empty' <<<"$reply")"
-  [[ -n "$invoice" ]] || die "$address did not return an invoice: $(jq -r '.reason // "no reason given"' <<<"$reply")"
+  if [[ -z "$invoice" ]]; then
+    local reason
+    reason="$(jq -r '.reason // .message // .error // empty' <<<"$reply" 2>/dev/null || true)"
+    echo "$address could not make an invoice, so $name cannot be bought right now." >&2
+    echo "The wallet said: ${reason:-nothing useful}" >&2
+    echo "This usually means the developer's Lightning address has no wallet connected behind it." >&2
+    exit 1
+  fi
 
   echo
   echo "Pay $sats sats to $address for $name."
