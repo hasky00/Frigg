@@ -1,6 +1,0 @@
-// Frigg rows for the Omarchy menu.
-// Merge these lines into ~/.config/omarchy/extensions/omarchy-menu.jsonc
-// (inside the outer braces). The dotted id places the row: "install.frigg"
-// appears under Install. Format confirmed in the Omarchy manual, section
-// "Adding your own menu entries". Not yet tested on a real machine.
-"install.frigg": {"icon":"","label":"Frigg","description":"The open market for Omarchy","aliases":["frigg","store","market"],"action":"omarchy-launch-floating-terminal-with-presentation frigg"},

@@ -187,7 +187,8 @@ footer .wrap { display: grid; gap: 6px; }
       <p class="lede">The open market for Omarchy.</p>
       <p class="sub">Developers publish what they build. Buyers pay them directly, in sats. Nobody stands in the middle taking a cut or asking for your ID.</p>
       <div class="actions">
-        <a class="btn solid" href="#apps">Browse apps</a>
+        <a class="btn solid" href="#get">Get Frigg</a>
+        <a class="btn ghost" href="#apps">Browse apps</a>
         <a class="btn ghost" href="#sell">Sell on Frigg</a>
       </div>
       <p class="stamp">Preview build · 24 November 2026 · not open to the public yet</p>
@@ -207,6 +208,20 @@ footer .wrap { display: grid; gap: 6px; }
     </div>
   </section>
 
+  <section id="get">
+    <div class="wrap">
+      <div class="head">
+        <h2>Get Frigg</h2>
+        <p>One line in your Omarchy terminal. It adds the <code>frigg</code> command and a Frigg row under Install in the Omarchy menu. Everything stays inside your home folder.</p>
+      </div>
+      <div class="cmd" id="get-cmd">
+        <code>curl -fsSL https://raw.githubusercontent.com/hasky00/Frigg/main/install.sh | bash</code>
+        <button type="button">Copy</button>
+      </div>
+      <p class="note" style="margin-top:12px">Not tested on a real Omarchy machine yet. <a href="https://github.com/hasky00/Frigg/blob/main/install.sh">Read the installer</a> before you run it.</p>
+    </div>
+  </section>
+
   <section id="apps">
     <div class="wrap">
       <div class="head">
@@ -223,12 +238,12 @@ footer .wrap { display: grid; gap: 6px; }
     <div class="wrap">
       <div class="head">
         <h2>How buying works</h2>
-        <p>The plan for the first release. Steps two and three are being built this week.</p>
+        <p>Built, and tested against a practice wallet. A real payment on a real Omarchy machine is the next test.</p>
       </div>
       <ol class="steps">
         <li><h3>Find it</h3><p>Open Frigg from the Omarchy menu under Install, or browse here.</p></li>
-        <li><h3>Pay the developer</h3><p>Scan a Lightning invoice. The sats land in the developer's wallet, not ours.</p></li>
-        <li><h3>Install it</h3><p>One command puts the app on your machine, the same way Omarchy installs everything else.</p></li>
+        <li><h3>Pay the developer</h3><p>Frigg asks the developer's wallet for an invoice and shows it as a QR code. The sats land in their wallet, not ours.</p></li>
+        <li><h3>Install it</h3><p>Frigg downloads the app from the developer, shows you the installer, and runs it when you say yes.</p></li>
       </ol>
     </div>
   </section>
@@ -338,7 +353,7 @@ footer .wrap { display: grid; gap: 6px; }
     cmd.appendChild(code);
     cmd.appendChild(copy);
     box.appendChild(cmd);
-    var note = el("p", "note", "Downloads from the developer and runs their installer. Not tested on Omarchy yet. ");
+    var note = el("p", "note", (app.price_sats ? "Pay in sats, then Frigg downloads it from the developer. " : "Downloads from the developer. ") + "Not tested on Omarchy yet. ");
     if (app.source && app.source.repo) {
       var link = el("a", null, "Read the source");
       link.href = app.source.repo + (app.source.branch ? "/tree/" + app.source.branch + (app.source.subdir ? "/" + app.source.subdir : "") : "");
@@ -347,6 +362,15 @@ footer .wrap { display: grid; gap: 6px; }
     box.appendChild(note);
     return box;
   }
+
+  var getCmd = document.getElementById("get-cmd");
+  getCmd.querySelector("button").addEventListener("click", function () {
+    var button = this;
+    var done = function (label) { button.textContent = label; setTimeout(function () { button.textContent = "Copy"; }, 1600); };
+    try {
+      navigator.clipboard.writeText(getCmd.querySelector("code").textContent).then(function () { done("Copied"); }, function () { done("Select it"); });
+    } catch (e) { done("Select it"); }
+  });
 
   // "Sell on Frigg": draw the seller's listing as they type.
   var preview = document.getElementById("sell-preview");

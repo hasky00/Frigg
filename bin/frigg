@@ -1,72 +1,183 @@
 #!/usr/bin/env bash
-# frigg: command-line client for the Frigg store (draft, untested on Omarchy).
+# frigg: the command-line side of the Frigg store for Omarchy.
 #
-#   frigg            list the apps in the store
-#   frigg info ID    show one app
-#   frigg install ID download an app from its developer and run its installer
-#                    (free apps only in this draft)
+#   frigg              browse the store and pick an app
+#   frigg list         list the apps
+#   frigg info ID      show one app
+#   frigg install ID   pay the developer (if the app has a price), download the
+#                      app from the developer, and run the developer's installer
 #
-# The catalog is a set of small JSON manifests served by the store site.
+# The catalog is a set of small JSON manifests. Payment is Lightning, sent
+# straight to the developer's own Lightning address: Frigg never holds money.
 set -euo pipefail
 
-FRIGG_URL="${FRIGG_URL:-https://frigg.haskylabs.com}"
+FRIGG_URL="${FRIGG_URL:-https://raw.githubusercontent.com/hasky00/Frigg/main}"
+FRIGG_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/frigg"
+LNURL_SCHEME="${FRIGG_LNURL_SCHEME:-https}"   # tests point this at a local http server
+PAY_TIMEOUT="${FRIGG_PAY_TIMEOUT:-600}"       # seconds to wait for a payment
 
-need() { command -v "$1" >/dev/null || { echo "frigg needs '$1'. Install it with: omarchy-pkg-add $1" >&2; exit 1; }; }
+die() { echo "$*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null || die "frigg needs '$1'. On Omarchy: omarchy-pkg-add $1"; }
 need curl
 need jq
 
-catalog() { curl -fsSL "$FRIGG_URL/apps/index.json"; }
-manifest() { curl -fsSL "$FRIGG_URL/apps/$1.json"; }
+catalog() { curl -fsSL "$FRIGG_URL/apps/index.json" || die "Could not reach the Frigg catalog at $FRIGG_URL"; }
+manifest() {
+  [[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "'$1' is not a valid app id."
+  curl -fsSL "$FRIGG_URL/apps/$1.json" 2>/dev/null || die "No app called '$1' in the store. Try: frigg list"
+}
 
-case "${1:-list}" in
-  list)
-    catalog | jq -r '.[] | "\(.id)\t\(.name)\t\(.tagline // "")"' | awk -F'\t' '{ printf "%-14s %-14s %s\n", $1, $2, $3 }'
-    ;;
-  info)
-    [[ -n "${2:-}" ]] || { echo "Usage: frigg info ID" >&2; exit 1; }
-    manifest "$2" | jq -r '"\(.name) \(.version // "")\nby \(.developer)\n\n\(.description // "No description yet.")\n\nPrice: \(if .price_sats then "\(.price_sats) sats" else "not set" end)"'
-    ;;
-  install)
-    [[ -n "${2:-}" ]] || { echo "Usage: frigg install ID" >&2; exit 1; }
-    need git
-    app="$(manifest "$2")"
-    name="$(jq -r '.name' <<<"$app")"
-    repo="$(jq -r '.source.repo // empty' <<<"$app")"
-    branch="$(jq -r '.source.branch // empty' <<<"$app")"
-    subdir="$(jq -r '.source.subdir // empty' <<<"$app")"
-    script="$(jq -r '.source.install // "install.sh"' <<<"$app")"
-    price="$(jq -r '.price_sats // 0' <<<"$app")"
+price_label() { jq -r 'if (.price_sats // 0) > 0 then "\(.price_sats) sats" else "free" end'; }
 
-    [[ -n "$repo" ]] || { echo "$name has no source to install from yet." >&2; exit 1; }
-    if (( price > 0 )); then
-      echo "$name costs $price sats. Paying from the terminal is not wired up yet." >&2
-      exit 1
-    fi
+cmd_list() {
+  catalog | jq -r '.[] | [.id, .name, (if (.price_sats // 0) > 0 then "\(.price_sats) sats" else "free" end), (.tagline // "")] | @tsv' \
+    | awk -F'\t' '{ printf "%-14s %-14s %-12s %s\n", $1, $2, $3, $4 }'
+}
 
-    dest="${XDG_DATA_HOME:-$HOME/.local/share}/frigg/apps/$2"
-    if [[ -d "$dest/.git" ]]; then
-      echo "Updating $name..."
-      git -C "$dest" pull --ff-only --quiet
+cmd_info() {
+  [[ -n "${1:-}" ]] || die "Usage: frigg info ID"
+  local app; app="$(manifest "$1")"
+  jq -r '"\(.name)\(if .version then " " + .version else "" end)\nby \(.developer)\n\n\(.description // "No description yet.")\n"' <<<"$app"
+  jq -r '(.features // [])[] | "  - " + .' <<<"$app"
+  echo
+  echo "Price:  $(price_label <<<"$app")"
+  jq -r 'if .lightning_address then "Paid to: " + .lightning_address else empty end' <<<"$app"
+  jq -r 'if .source.repo then "Source: " + .source.repo else empty end' <<<"$app"
+}
+
+# ---- payment ----------------------------------------------------------------
+# LNURL-pay: ask the developer's Lightning address for an invoice, show it, and
+# (when the wallet provider supports it) watch until it is settled.
+
+receipt_file() { echo "$FRIGG_HOME/receipts/$1.json"; }
+
+pay() {
+  local id="$1" name="$2" sats="$3" address="$4"
+  local user="${address%@*}" domain="${address#*@}"
+  [[ "$address" == *@* && -n "$user" && -n "$domain" ]] || die "$name has no valid Lightning address to pay."
+
+  local meta callback min max
+  meta="$(curl -fsSL "$LNURL_SCHEME://$domain/.well-known/lnurlp/$user")" || die "Could not reach $address to ask for an invoice."
+  callback="$(jq -r '.callback // empty' <<<"$meta")"
+  min="$(jq -r '.minSendable // 0' <<<"$meta")"
+  max="$(jq -r '.maxSendable // 0' <<<"$meta")"
+  [[ -n "$callback" ]] || die "$address did not answer like a Lightning address."
+
+  local msats=$(( sats * 1000 ))
+  (( msats >= min && (max == 0 || msats <= max) )) || die "$address does not accept a payment of $sats sats."
+
+  local sep="?"; [[ "$callback" == *\?* ]] && sep="&"
+  local reply invoice verify
+  reply="$(curl -fsSL "${callback}${sep}amount=${msats}")" || die "$address did not return an invoice."
+  invoice="$(jq -r '.pr // empty' <<<"$reply")"
+  verify="$(jq -r '.verify // empty' <<<"$reply")"
+  [[ -n "$invoice" ]] || die "$address did not return an invoice: $(jq -r '.reason // "no reason given"' <<<"$reply")"
+
+  echo
+  echo "Pay $sats sats to $address for $name."
+  echo "The money goes straight to the developer. Frigg takes nothing."
+  echo
+  if command -v qrencode >/dev/null; then
+    qrencode -t ansiutf8 -m 1 "lightning:$invoice"
+  fi
+  echo "$invoice"
+  echo
+
+  if [[ -n "$verify" ]]; then
+    echo "Waiting for the payment (Ctrl-C to cancel)..."
+    local waited=0 state
+    while (( waited < PAY_TIMEOUT )); do
+      state="$(curl -fsSL "$verify" 2>/dev/null || true)"
+      if [[ -n "$state" ]] && jq -e '.settled == true' <<<"$state" >/dev/null 2>&1; then
+        mkdir -p "$FRIGG_HOME/receipts"
+        jq -n --arg id "$id" --arg to "$address" --argjson sats "$sats" \
+              --arg preimage "$(jq -r '.preimage // empty' <<<"$state")" --arg at "$(date -u +%FT%TZ)" \
+              '{app: $id, paid_to: $to, sats: $sats, preimage: $preimage, paid_at: $at}' > "$(receipt_file "$id")"
+        echo "Paid. Thank you for supporting $name."
+        return 0
+      fi
+      sleep 2; waited=$(( waited + 2 ))
+    done
+    die "No payment arrived in time. Nothing was installed."
+  fi
+
+  # No way to check with this wallet provider, so trust the buyer.
+  read -r -p "This wallet cannot confirm payments to Frigg. Press Enter once you have paid, or Ctrl-C to cancel. " _
+  mkdir -p "$FRIGG_HOME/receipts"
+  jq -n --arg id "$id" --arg to "$address" --argjson sats "$sats" --arg at "$(date -u +%FT%TZ)" \
+        '{app: $id, paid_to: $to, sats: $sats, preimage: "", confirmed_by: "buyer", paid_at: $at}' > "$(receipt_file "$id")"
+}
+
+# ---- install ----------------------------------------------------------------
+
+cmd_install() {
+  [[ -n "${1:-}" ]] || die "Usage: frigg install ID"
+  need git
+  local id="$1" app name repo branch subdir script price address
+  app="$(manifest "$id")"
+  name="$(jq -r '.name' <<<"$app")"
+  repo="$(jq -r '.source.repo // empty' <<<"$app")"
+  branch="$(jq -r '.source.branch // empty' <<<"$app")"
+  subdir="$(jq -r '.source.subdir // empty' <<<"$app")"
+  script="$(jq -r '.source.install // "install.sh"' <<<"$app")"
+  price="$(jq -r '.price_sats // 0' <<<"$app")"
+  address="$(jq -r '.lightning_address // empty' <<<"$app")"
+
+  [[ "$repo" == https://* ]] || die "$name has no source to install from yet."
+  [[ "$subdir" != *..* && "$script" != *..* && "$script" != /* && "$subdir" != /* ]] || die "$name has an unsafe install path in its listing."
+
+  if (( price > 0 )); then
+    if [[ -f "$(receipt_file "$id")" ]]; then
+      echo "You already paid for $name. Not charging again."
     else
-      echo "Downloading $name from $repo..."
-      mkdir -p "$(dirname "$dest")"
-      git clone --quiet --depth 1 ${branch:+--branch "$branch"} "$repo" "$dest"
+      pay "$id" "$name" "$price" "$address"
     fi
+  fi
 
-    installer="$dest/${subdir:+$subdir/}$script"
-    [[ -f "$installer" ]] || { echo "No installer found at $installer" >&2; exit 1; }
+  local dest="$FRIGG_HOME/apps/$id"
+  if [[ -d "$dest/.git" ]]; then
+    echo "Updating $name..."
+    git -C "$dest" pull --ff-only --quiet
+  else
+    echo "Downloading $name from $repo..."
+    mkdir -p "$(dirname "$dest")"
+    git clone --quiet --depth 1 ${branch:+--branch "$branch"} "$repo" "$dest"
+  fi
 
-    # Frigg does not review code. Say so, and let the buyer look first.
-    echo
-    echo "$name comes straight from its developer. Frigg has not reviewed it."
-    echo "The installer about to run is: $installer"
-    read -r -p "Run it now? [y/N] " answer
-    [[ "$answer" =~ ^[Yy]$ ]] || { echo "Nothing was installed. The files are in $dest if you want to read them."; exit 0; }
+  local installer="$dest/${subdir:+$subdir/}$script"
+  [[ -f "$installer" ]] || die "No installer found at $installer"
 
-    bash "$installer"
-    ;;
-  *)
-    echo "Usage: frigg [list | info ID | install ID]" >&2
-    exit 1
-    ;;
+  # Frigg does not review code. Say so, and let the buyer look first.
+  echo
+  echo "$name comes straight from its developer. Frigg has not reviewed it."
+  echo "The installer about to run is: $installer"
+  local answer
+  read -r -p "Run it now? [y/N] " answer
+  if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+    echo "Nothing was installed. The files are in $dest if you want to read them."
+    return 0
+  fi
+
+  bash "$installer"
+}
+
+# ---- browse -----------------------------------------------------------------
+
+cmd_browse() {
+  need fzf
+  local pick id
+  pick="$(cmd_list | fzf --prompt 'Frigg > ' --header 'Enter: install   Esc: leave' \
+            --preview "$0 info {1}" --preview-window 'down:60%:wrap' --no-multi || true)"
+  [[ -n "$pick" ]] || return 0
+  id="${pick%% *}"
+  cmd_install "$id"
+}
+
+case "${1:-}" in
+  "")       if [[ -t 0 && -t 1 ]]; then cmd_browse; else cmd_list; fi ;;
+  list)     cmd_list ;;
+  info)     cmd_info "${2:-}" ;;
+  install)  cmd_install "${2:-}" ;;
+  -h|--help|help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *)        die "Usage: frigg [list | info ID | install ID]" ;;
 esac
