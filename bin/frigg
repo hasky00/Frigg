@@ -8,14 +8,15 @@
 #   frigg install ID   pay the developer (if the app has a price), download the
 #                      app from the developer, and run the developer's installer
 #
-# The catalog is a set of small JSON manifests. Payment is Lightning, sent
-# straight to the developer's own Lightning address: Frigg never holds money.
+# The catalog is a set of small JSON manifests. Payment goes straight to the
+# developer, by Lightning or on-chain Bitcoin: Frigg never holds money.
 set -euo pipefail
 
 FRIGG_URL="${FRIGG_URL:-https://raw.githubusercontent.com/hasky00/Frigg/main}"
 FRIGG_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/frigg"
 LNURL_SCHEME="${FRIGG_LNURL_SCHEME:-https}"   # tests point this at a local http server
 PAY_TIMEOUT="${FRIGG_PAY_TIMEOUT:-600}"       # seconds to wait for a payment
+MEMPOOL_API="${FRIGG_MEMPOOL_API:-https://mempool.space/api}"  # where on-chain payments are looked up
 
 SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
 
@@ -45,6 +46,7 @@ cmd_info() {
   echo
   echo "Price:  $(price_label <<<"$app")"
   jq -r 'if .lightning_address then "Paid to: " + .lightning_address else empty end' <<<"$app"
+  jq -r 'if .bitcoin_address then "On-chain: " + .bitcoin_address else empty end' <<<"$app"
   jq -r 'if .source.repo then "Source: " + .source.repo else empty end' <<<"$app"
 }
 
@@ -54,34 +56,32 @@ cmd_info() {
 
 receipt_file() { echo "$FRIGG_HOME/receipts/$1.json"; }
 
-pay() {
+pay_lightning() {
   local id="$1" name="$2" sats="$3" address="$4"
   local user="${address%@*}" domain="${address#*@}"
-  [[ "$address" == *@* && -n "$user" && -n "$domain" ]] || die "$name has no valid Lightning address to pay."
+  [[ "$address" == *@* && -n "$user" && -n "$domain" ]] || { echo "$name has no valid Lightning address." >&2; return 1; }
 
   local meta callback min max
-  meta="$(curl -fsSL "$LNURL_SCHEME://$domain/.well-known/lnurlp/$user")" || die "Could not reach $address to ask for an invoice."
+  meta="$(curl -fsSL "$LNURL_SCHEME://$domain/.well-known/lnurlp/$user")" || { echo "Could not reach $address to ask for an invoice." >&2; return 1; }
   callback="$(jq -r '.callback // empty' <<<"$meta")"
   min="$(jq -r '.minSendable // 0' <<<"$meta")"
   max="$(jq -r '.maxSendable // 0' <<<"$meta")"
-  [[ -n "$callback" ]] || die "$address did not answer like a Lightning address."
+  [[ -n "$callback" ]] || { echo "$address did not answer like a Lightning address." >&2; return 1; }
 
   local msats=$(( sats * 1000 ))
-  (( msats >= min && (max == 0 || msats <= max) )) || die "$address does not accept a payment of $sats sats."
+  (( msats >= min && (max == 0 || msats <= max) )) || { echo "$address does not accept a payment of $sats sats." >&2; return 1; }
 
   local sep="?"; [[ "$callback" == *\?* ]] && sep="&"
   local reply invoice verify
   # No -f here: when a wallet refuses, its answer says why, and the buyer should see it.
-  reply="$(curl -sSL "${callback}${sep}amount=${msats}")" || die "Could not reach $address to get an invoice."
+  reply="$(curl -sSL "${callback}${sep}amount=${msats}")" || { echo "Could not reach $address to get an invoice." >&2; return 1; }
   invoice="$(jq -r '.pr // empty' <<<"$reply")"
   verify="$(jq -r '.verify // empty' <<<"$reply")"
   if [[ -z "$invoice" ]]; then
     local reason
     reason="$(jq -r '.reason // .message // .error // empty' <<<"$reply" 2>/dev/null || true)"
-    echo "$address could not make an invoice, so $name cannot be bought right now." >&2
-    echo "The wallet said: ${reason:-nothing useful}" >&2
-    echo "This usually means the developer's Lightning address has no wallet connected behind it." >&2
-    exit 1
+    echo "$address could not make a Lightning invoice. The wallet said: ${reason:-nothing useful}" >&2
+    return 1
   fi
 
   echo
@@ -119,12 +119,75 @@ pay() {
         '{app: $id, paid_to: $to, sats: $sats, preimage: "", confirmed_by: "buyer", paid_at: $at}' > "$(receipt_file "$id")"
 }
 
+# On-chain: show the developer's Bitcoin address with the amount, then watch the
+# public mempool for a new payment to it. Slower than Lightning, and the buyer's
+# wallet adds a network fee, but it works from any Bitcoin wallet.
+
+pay_onchain() {
+  local id="$1" name="$2" sats="$3" address="$4"
+  [[ "$address" =~ ^(bc1[a-z0-9]{20,90}|[13][a-km-zA-HJ-NP-Z1-9]{25,39})$ ]] || { echo "$name has no valid Bitcoin address." >&2; return 1; }
+
+  # Remember what has already been paid to this address, so only a new payment counts.
+  local before
+  before="$(curl -fsSL "$MEMPOOL_API/address/$address/txs" | jq -c '[.[].txid]')" || { echo "Could not look up $address to watch for your payment." >&2; return 1; }
+
+  local btc; btc="$(printf '%d.%08d' $(( sats / 100000000 )) $(( sats % 100000000 )))"
+  local uri="bitcoin:$address?amount=$btc"
+
+  echo
+  echo "Pay $sats sats ($btc BTC) to the developer of $name, on-chain."
+  echo "The money goes straight to the developer. Frigg takes nothing."
+  echo "Your wallet adds a network fee on top."
+  echo
+  if command -v qrencode >/dev/null; then
+    qrencode -t ansiutf8 -m 1 "$uri"
+  fi
+  echo "$address"
+  echo "Amount: $sats sats"
+  echo
+  echo "Waiting to see your payment on the network (Ctrl-C to cancel)..."
+
+  local waited=0 txs txid
+  while (( waited < PAY_TIMEOUT )); do
+    txs="$(curl -fsSL "$MEMPOOL_API/address/$address/txs" 2>/dev/null || true)"
+    if [[ -n "$txs" ]]; then
+      txid="$(jq -r --arg a "$address" --argjson sats "$sats" --argjson before "$before" \
+        '[.[] | select(.txid as $t | ($before | index($t)) | not)
+              | select(([.vout[] | select(.scriptpubkey_address == $a) | .value] | add // 0) >= $sats) | .txid][0] // empty' <<<"$txs" 2>/dev/null || true)"
+      if [[ -n "$txid" ]]; then
+        mkdir -p "$FRIGG_HOME/receipts"
+        jq -n --arg id "$id" --arg to "$address" --argjson sats "$sats" --arg txid "$txid" --arg at "$(date -u +%FT%TZ)" \
+              '{app: $id, paid_to: $to, sats: $sats, txid: $txid, paid_at: $at}' > "$(receipt_file "$id")"
+        echo "Payment seen. Thank you for supporting $name."
+        return 0
+      fi
+    fi
+    sleep 5; waited=$(( waited + 5 ))
+  done
+  echo "No payment showed up in time." >&2
+  return 1
+}
+
+# Lightning first, because it is instant and nearly free. On-chain if the
+# developer has no working Lightning address.
+pay() {
+  local id="$1" name="$2" sats="$3" lightning="$4" bitcoin="$5"
+  if [[ -n "$lightning" ]]; then
+    pay_lightning "$id" "$name" "$sats" "$lightning" && return 0
+    [[ -n "$bitcoin" ]] && echo "Switching to an on-chain Bitcoin payment." >&2
+  fi
+  if [[ -n "$bitcoin" ]]; then
+    pay_onchain "$id" "$name" "$sats" "$bitcoin" && return 0
+  fi
+  die "$name could not be paid for, so nothing was installed."
+}
+
 # ---- install ----------------------------------------------------------------
 
 cmd_install() {
   [[ -n "${1:-}" ]] || die "Usage: frigg install ID"
   need git
-  local id="$1" app name repo branch subdir script price address
+  local id="$1" app name repo branch subdir script price address bitcoin
   app="$(manifest "$id")"
   name="$(jq -r '.name' <<<"$app")"
   repo="$(jq -r '.source.repo // empty' <<<"$app")"
@@ -133,6 +196,7 @@ cmd_install() {
   script="$(jq -r '.source.install // "install.sh"' <<<"$app")"
   price="$(jq -r '.price_sats // 0' <<<"$app")"
   address="$(jq -r '.lightning_address // empty' <<<"$app")"
+  bitcoin="$(jq -r '.bitcoin_address // empty' <<<"$app")"
 
   [[ "$repo" == https://* ]] || die "$name has no source to install from yet."
   [[ "$subdir" != *..* && "$script" != *..* && "$script" != /* && "$subdir" != /* ]] || die "$name has an unsafe install path in its listing."
@@ -141,7 +205,7 @@ cmd_install() {
     if [[ -f "$(receipt_file "$id")" ]]; then
       echo "You already paid for $name. Not charging again."
     else
-      pay "$id" "$name" "$price" "$address"
+      pay "$id" "$name" "$price" "$address" "$bitcoin"
     fi
   fi
 
