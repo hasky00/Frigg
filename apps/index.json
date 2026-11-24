@@ -21,7 +21,7 @@
       "install": "install.sh"
     },
     "price_sats": 1000,
-    "lightning_address": "erna@getalby.com",
+    "lightning_address": "haskylabs@getalby.com",
     "status": "listed",
     "license": null,
     "icon": null,
@@ -51,7 +51,7 @@
     },
     "license": "MIT",
     "price_sats": 1000,
-    "lightning_address": "erna@getalby.com",
+    "lightning_address": "haskylabs@getalby.com",
     "status": "listed",
     "icon": "apps/icons/hasky-shelf.svg",
     "screenshots": [],
