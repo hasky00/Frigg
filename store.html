@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frigg Store</title>
+<meta name="description" content="Browse and buy apps for Omarchy. Pay the developer directly, in sats.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <svg viewBox="0 0 64 64" role="img">
+        <circle cx="32" cy="32" r="31" fill="#ffffff"/>
+        <path d="M13 21c-5-3-7-9-5-15 2 6 6 9 11 10z" fill="#c8102e"/>
+        <path d="M51 21c5-3 7-9 5-15-2 6-6 9-11 10z" fill="#c8102e"/>
+        <path d="M14 40c0-12 8-21 18-21s18 9 18 21z" fill="#c8102e"/>
+        <rect x="11" y="39" width="42" height="6" rx="2" fill="#9c0c23"/>
+        <rect x="29.5" y="19" width="5" height="34" rx="2" fill="#9c0c23"/>
+        <circle cx="21" cy="42" r="1.4" fill="#ffffff"/>
+        <circle cx="43" cy="42" r="1.4" fill="#ffffff"/>
+      </svg>
+    <div>
+      <h1>Frigg</h1>
+      <p>The open market for Omarchy</p>
+    </div>
+    <span class="spacer"></span>
+    <a href="index.html#sell">Sell your app</a>
+  </div>
+</header>
+
+<main class="store-main">
+  <div class="wrap">
+    <div class="head">
+      <h2>Apps</h2>
+      <p>Press the price to buy. You pay the developer directly, in sats, and Frigg installs the app for you.</p>
+    </div>
+    <div class="apps" id="app-list">
+      <p class="note">Loading the catalog.</p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>&copy; 2026 Hasky Labs. All rights reserved. Made by Hasky Labs, Copenhagen.</p>
+    <p>Frigg is an independent project and is not affiliated with Omarchy or 37signals.</p>
+  </div>
+</footer>
+
+<script src="catalog.js"></script>
+<script>Frigg.load(document.getElementById("app-list"));</script>
+</body>
+</html>

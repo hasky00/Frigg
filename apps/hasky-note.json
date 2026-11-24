@@ -22,5 +22,8 @@
   "price_sats": 1000,
   "lightning_address": "erna@getalby.com",
   "status": "listed",
-  "license": null
+  "license": null,
+  "icon": null,
+  "screenshots": [],
+  "category": "Notes"
 }

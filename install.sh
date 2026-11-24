@@ -3,17 +3,20 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/hasky00/Frigg/main/install.sh | bash
 #
-# It does two things, both inside your home folder:
+# It does three things, all inside your home folder:
 #   1. puts the `frigg` command in ~/.local/bin
 #   2. adds a "Frigg" row under Install in the Omarchy menu, through your own
 #      menu extension file (a backup of that file is kept next to it)
-# To remove Frigg: delete ~/.local/bin/frigg and the "install.frigg" line.
+#   3. registers frigg:// links, so the store's Buy buttons can start an install
+# To remove Frigg: delete ~/.local/bin/frigg, the "install.frigg" line, and
+# ~/.local/share/applications/frigg-link.desktop.
 set -euo pipefail
 
 FRIGG_URL="${FRIGG_URL:-https://raw.githubusercontent.com/hasky00/Frigg/main}"
 BIN="$HOME/.local/bin"
 MENU="$HOME/.config/omarchy/extensions/omarchy-menu.jsonc"
-ROW='  "install.frigg": {"icon":"","label":"Frigg","description":"The open market for Omarchy","aliases":["frigg","store","market"],"action":"omarchy-launch-floating-terminal-with-presentation ~/.local/bin/frigg"},'
+ROW='  "install.frigg": {"icon":"","label":"Frigg","description":"The open market for Omarchy","aliases":["frigg","store","market"],"action":"~/.local/bin/frigg store"},'
+APPS="$HOME/.local/share/applications"
 
 if (( EUID == 0 )); then
   echo "Run this as yourself, not as root: Frigg installs into your own home folder." >&2
@@ -44,8 +47,16 @@ add_menu_row() {
     printf '{\n%s\n}\n' "$ROW" > "$MENU"
     return 0
   fi
-  if grep -q '"install.frigg"' "$MENU"; then
+  if grep -qF "$ROW" "$MENU"; then
     return 0
+  fi
+  if grep -q '"install.frigg"' "$MENU"; then
+    # An older Frigg row: swap that one line for the current one.
+    cp "$MENU" "$MENU.before-frigg"
+    awk -v row="$ROW" '/^[[:space:]]*"install\.frigg"[[:space:]]*:/ { print row; next } { print }' "$MENU.before-frigg" > "$MENU.new"
+    if menu_is_valid "$MENU.new"; then mv "$MENU.new" "$MENU"; return 0; fi
+    rm -f "$MENU.new"
+    return 1
   fi
   if ! menu_is_valid "$MENU"; then
     return 1                        # not touching a file we cannot read
@@ -77,6 +88,23 @@ add_menu_row() {
     return 1
   fi
 }
+
+# Lets the store window's Buy buttons (frigg://install/...) reach the frigg command.
+mkdir -p "$APPS"
+cat > "$APPS/frigg-link.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Frigg
+Comment=Opens Frigg store links
+Exec=$BIN/frigg open %u
+NoDisplay=true
+Terminal=false
+MimeType=x-scheme-handler/frigg;
+DESKTOP
+if command -v xdg-mime >/dev/null; then
+  xdg-mime default frigg-link.desktop x-scheme-handler/frigg 2>/dev/null || true
+fi
+command -v update-desktop-database >/dev/null && update-desktop-database "$APPS" >/dev/null 2>&1 || true
 
 if add_menu_row; then
   echo "Added Frigg to the Omarchy menu, under Install."

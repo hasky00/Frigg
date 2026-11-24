@@ -11,7 +11,8 @@ curl -fsSL https://raw.githubusercontent.com/hasky00/Frigg/main/install.sh | bas
 This adds the `frigg` command to `~/.local/bin` and a Frigg row under Install in the Omarchy menu. Then:
 
 ```bash
-frigg                   # browse the store
+frigg store             # open the store window
+frigg                   # browse the store in the terminal
 frigg info hasky-shelf  # read about one app
 frigg install hasky-shelf
 ```
@@ -29,4 +30,4 @@ Tested against a practice wallet and a copy of the catalog. Not yet tested with 
 
 Frigg is an independent project by Hasky Labs and is not affiliated with Omarchy or 37signals.
 
-Copyright Hasky Labs, Copenhagen. All rights reserved.
+Made by Hasky Labs, Copenhagen. Free and open source under the MIT license: use it, change it, build your own, and keep the copyright notice.

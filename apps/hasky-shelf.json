@@ -22,5 +22,8 @@
   "license": "MIT",
   "price_sats": 1000,
   "lightning_address": "erna@getalby.com",
-  "status": "listed"
+  "status": "listed",
+  "icon": "apps/icons/hasky-shelf.svg",
+  "screenshots": [],
+  "category": "Books"
 }

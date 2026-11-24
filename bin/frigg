@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # frigg: the command-line side of the Frigg store for Omarchy.
 #
-#   frigg              browse the store and pick an app
+#   frigg store        open the store window
+#   frigg              browse the store in the terminal
 #   frigg list         list the apps
 #   frigg info ID      show one app
 #   frigg install ID   pay the developer (if the app has a price), download the
@@ -15,6 +16,8 @@ FRIGG_URL="${FRIGG_URL:-https://raw.githubusercontent.com/hasky00/Frigg/main}"
 FRIGG_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/frigg"
 LNURL_SCHEME="${FRIGG_LNURL_SCHEME:-https}"   # tests point this at a local http server
 PAY_TIMEOUT="${FRIGG_PAY_TIMEOUT:-600}"       # seconds to wait for a payment
+
+SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
 
 die() { echo "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null || die "frigg needs '$1'. On Omarchy: omarchy-pkg-add $1"; }
@@ -167,10 +170,40 @@ cmd_browse() {
   need fzf
   local pick id
   pick="$(cmd_list | fzf --prompt 'Frigg > ' --header 'Enter: install   Esc: leave' \
-            --preview "$0 info {1}" --preview-window 'down:60%:wrap' --no-multi || true)"
+            --preview "$SELF info {1}" --preview-window 'down:60%:wrap' --no-multi || true)"
   [[ -n "$pick" ]] || return 0
   id="${pick%% *}"
   cmd_install "$id"
+}
+
+# ---- hand-over from the store window ----------------------------------------
+# The store's Buy button is a link like frigg://install/hasky-shelf. The desktop
+# passes it here; we open a terminal for the payment and the install.
+
+run_in_terminal() {
+  if command -v omarchy-launch-floating-terminal-with-presentation >/dev/null; then
+    omarchy-launch-floating-terminal-with-presentation "$@"
+  elif command -v xdg-terminal-exec >/dev/null; then
+    xdg-terminal-exec -e "$@"
+  else
+    "$@"
+  fi
+}
+
+cmd_open() {
+  local url="${1:-}" id
+  [[ "$url" =~ ^frigg://install/([a-z0-9][a-z0-9-]*)/?$ ]] || die "Frigg does not understand this link: $url"
+  id="${BASH_REMATCH[1]}"
+  run_in_terminal "$SELF" install "$id"
+}
+
+cmd_store() {
+  local page="${FRIGG_STORE_URL:-https://hasky00.github.io/Frigg/store.html}"
+  if command -v omarchy-launch-webapp >/dev/null; then
+    omarchy-launch-webapp "$page"
+  else
+    xdg-open "$page"
+  fi
 }
 
 case "${1:-}" in
@@ -178,6 +211,8 @@ case "${1:-}" in
   list)     cmd_list ;;
   info)     cmd_info "${2:-}" ;;
   install)  cmd_install "${2:-}" ;;
-  -h|--help|help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' ;;
-  *)        die "Usage: frigg [list | info ID | install ID]" ;;
+  open)     cmd_open "${2:-}" ;;
+  store)    cmd_store ;;
+  -h|--help|help) sed -n '2,11p' "$SELF" | sed 's/^# \{0,1\}//' ;;
+  *)        die "Usage: frigg [store | list | info ID | install ID]" ;;
 esac
