@@ -136,6 +136,12 @@ section { padding: 56px 0; border-bottom: 1px solid var(--line); }
 .two > * { min-width: 0; }
 pre { margin: 0; overflow-x: auto; background: var(--panel); border: 1px solid var(--line); padding: 16px; font: 400 13.5px/1.55 var(--mono); }
 .stack { display: grid; gap: 14px; }
+.sell-form { display: grid; gap: 16px; background: var(--panel); border: 1px solid var(--line); padding: 22px; }
+.sell-form label { display: grid; gap: 6px; font-weight: 600; font-size: 16px; }
+.sell-form .hint { font-weight: 400; color: var(--muted); font-size: 14.5px; }
+.sell-form input { font: 400 16px/1.3 var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 11px 12px; width: 100%; }
+.sell-form input:focus-visible { outline: 3px solid var(--red); outline-offset: 1px; }
+.eyebrow { font: 500 13px/1 var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .honest { border: 1px solid var(--line); border-left: 4px solid var(--wait); background: var(--panel); padding: 18px 20px; display: grid; gap: 8px; }
 .honest h3 { font-size: 20px; text-transform: uppercase; }
 .honest ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15.5px; color: var(--muted); }
@@ -231,29 +237,38 @@ footer .wrap { display: grid; gap: 6px; }
     <div class="wrap">
       <div class="head">
         <h2>Sell on Frigg</h2>
-        <p>A listing is one JSON file. You set the price and the Lightning address the money goes to.</p>
+        <p>Tell Frigg five things about your app. Type them in and watch your listing appear, exactly as buyers will see it.</p>
       </div>
       <div class="two">
-        <pre aria-label="Example manifest">{
-  "id": "your-app",
-  "name": "Your App",
-  "version": "1.0.0",
-  "developer": "You",
-  "tagline": "One line on what it does.",
-  "source": "https://github.com/you/your-app",
-  "price_sats": 21000,
-  "lightning_address": "you@yourwallet.com"
-}</pre>
+        <form class="sell-form" id="sell-form" autocomplete="off">
+          <label for="f-name">What is your app called?
+            <input id="f-name" type="text" placeholder="Night Lamp" maxlength="40">
+          </label>
+          <label for="f-about">What does it do, in one sentence?
+            <input id="f-about" type="text" placeholder="Dims your screen when the sun goes down." maxlength="140">
+          </label>
+          <label for="f-who">Who made it?
+            <input id="f-who" type="text" placeholder="Your name or studio" maxlength="40">
+          </label>
+          <label for="f-price">What does it cost, in sats? <span class="hint">Leave empty for a free app.</span>
+            <input id="f-price" type="number" min="0" step="1" inputmode="numeric" placeholder="21000">
+          </label>
+          <label for="f-ln">Where should the sats go? <span class="hint">Your Lightning address. Buyers pay you, not Frigg.</span>
+            <input id="f-ln" type="text" placeholder="you@yourwallet.com" maxlength="80">
+          </label>
+          <p class="note">Sending your app to Frigg opens later this week. Nothing you type here leaves this page.</p>
+        </form>
         <div class="stack">
+          <p class="eyebrow">Your listing</p>
+          <div id="sell-preview"></div>
           <div class="honest">
-            <h3>What is true today</h3>
+            <h3>Good to know</h3>
             <ul>
-              <li>The submission form is not open yet.</li>
-              <li>The automated check will be basic. It is not a security review, so read the source of what you install.</li>
-              <li>Listing is free. The flat fee is not decided.</li>
+              <li>Listing your app is free.</li>
+              <li>Frigg runs a basic automatic check on every app. It is not a full security review.</li>
+              <li>You keep your customers and your price. Change either whenever you like.</li>
             </ul>
           </div>
-          <p class="note">Frigg puts its row in the Omarchy menu through the user's own extension file, <code>~/.config/omarchy/extensions/omarchy-menu.jsonc</code>, so Omarchy updates leave it alone.</p>
         </div>
       </div>
     </div>
@@ -332,6 +347,39 @@ footer .wrap { display: grid; gap: 6px; }
     box.appendChild(note);
     return box;
   }
+
+  // "Sell on Frigg": draw the seller's listing as they type.
+  var preview = document.getElementById("sell-preview");
+  var fields = {
+    name: document.getElementById("f-name"),
+    about: document.getElementById("f-about"),
+    who: document.getElementById("f-who"),
+    price: document.getElementById("f-price"),
+    ln: document.getElementById("f-ln")
+  };
+
+  function drawPreview() {
+    var price = parseInt(fields.price.value, 10);
+    var box = el("article", "app");
+    var top = el("div", "app-top");
+    top.appendChild(el("h3", null, fields.name.value.trim() || "Your app"));
+    top.appendChild(el("span", "by", "by " + (fields.who.value.trim() || "you")));
+    box.appendChild(top);
+    box.appendChild(el("p", null, fields.about.value.trim() || "One sentence about what your app does shows up here."));
+    var facts = el("div", "facts");
+    facts.appendChild(el("span", "pill ok", price > 0 ? price.toLocaleString("en-GB") + " sats" : "free"));
+    if (price > 0) {
+      facts.appendChild(el("span", fields.ln.value.trim() ? "pill" : "pill wait",
+        fields.ln.value.trim() ? "paid to " + fields.ln.value.trim() : "add a Lightning address to get paid"));
+    }
+    box.appendChild(facts);
+    preview.textContent = "";
+    preview.appendChild(box);
+  }
+
+  Object.keys(fields).forEach(function (key) { fields[key].addEventListener("input", drawPreview); });
+  document.getElementById("sell-form").addEventListener("submit", function (event) { event.preventDefault(); });
+  drawPreview();
 
   fetch("apps/index.json")
     .then(function (res) { if (!res.ok) throw new Error(res.status); return res.json(); })
