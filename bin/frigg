@@ -56,6 +56,41 @@ cmd_info() {
 
 receipt_file() { echo "$FRIGG_HOME/receipts/$1.json"; }
 
+# A code a phone can actually read. In the terminal: true black on true white
+# (the theme's own colours wash it out) with a white border, and only when the
+# window is big enough to show all of it, because a code cut off at the edge
+# cannot be scanned. It is also opened as a picture when the desktop can.
+show_qr() {
+  command -v qrencode >/dev/null || return 0
+  local data="$1" plain width rows cols lines fits=0 shown=0
+
+  plain="$(qrencode -t UTF8 -m 2 "$data" 2>/dev/null || true)"
+  if [[ -n "$plain" ]]; then
+    width="$(head -n 1 <<<"$plain" | wc -m)"
+    rows="$(wc -l <<<"$plain")"
+    cols="$(tput cols 2>/dev/null || echo 80)"
+    lines="$(tput lines 2>/dev/null || echo 24)"
+    (( width <= cols && rows + 4 <= lines )) && fits=1
+  fi
+
+  local picture="${XDG_RUNTIME_DIR:-/tmp}/frigg-pay.png"
+  if [[ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]] && command -v xdg-open >/dev/null \
+     && qrencode -s 10 -m 4 -o "$picture" "$data" 2>/dev/null; then
+    (setsid xdg-open "$picture" >/dev/null 2>&1 &)
+    shown=1
+  fi
+
+  if (( fits )); then
+    qrencode -t ANSI256UTF8 -m 2 "$data" || true
+    (( shown )) && echo "The same code also opened as a picture, if that is easier to scan."
+  elif (( shown )); then
+    echo "This window is too small for the code, so it opened as a picture. Scan that."
+  else
+    echo "This window is too small to show the code. Make it bigger (Super + F) and run frigg again, or copy the invoice below into your wallet."
+  fi
+  return 0
+}
+
 pay_lightning() {
   local id="$1" name="$2" sats="$3" address="$4"
   local user="${address%@*}" domain="${address#*@}"
@@ -88,9 +123,7 @@ pay_lightning() {
   echo "Pay $sats sats to $address for $name."
   echo "The money goes straight to the developer. Frigg takes nothing."
   echo
-  if command -v qrencode >/dev/null; then
-    qrencode -t ansiutf8 -m 1 "lightning:$invoice"
-  fi
+  show_qr "LIGHTNING:${invoice^^}"   # upper case makes a much less dense code; wallets read both
   echo "$invoice"
   echo
 
@@ -139,9 +172,7 @@ pay_onchain() {
   echo "The money goes straight to the developer. Frigg takes nothing."
   echo "Your wallet adds a network fee on top."
   echo
-  if command -v qrencode >/dev/null; then
-    qrencode -t ansiutf8 -m 1 "$uri"
-  fi
+  show_qr "$uri"
   echo "$address"
   echo "Amount: $sats sats"
   echo
