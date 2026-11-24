@@ -19,8 +19,8 @@
     "subdir": "hasky-note",
     "install": "install.sh"
   },
-  "price_sats": null,
-  "lightning_address": null,
+  "price_sats": 5000,
+  "lightning_address": "erna@getalby.com",
   "status": "listed",
   "license": null
 }
