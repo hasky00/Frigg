@@ -24,14 +24,17 @@
     "name": "Hasky Shelf",
     "version": null,
     "developer": "Hasky Labs",
-    "tagline": null,
-    "description": null,
-    "features": [],
+    "tagline": "A bookshelf for the books you write.",
+    "description": "Write your own book and publish it. Keep it on your shelf, share it with one special person, or send it to anyone with a link.",
+    "features": [
+      "Write and publish your own book",
+      "Share with one person or with a link"
+    ],
     "built_with": null,
     "hotkey": null,
     "source": null,
     "price_sats": null,
     "lightning_address": null,
-    "status": "awaiting-details"
+    "status": "listing-draft"
   }
 ]
