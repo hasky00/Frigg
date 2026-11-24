@@ -1,0 +1,20 @@
+{
+  "id": "hasky-note",
+  "name": "Hasky Note",
+  "version": "0.1.0",
+  "developer": "Hasky Labs",
+  "tagline": "Fast terminal notes for Omarchy.",
+  "description": "Plain markdown files in ~/notes, themed by your current Omarchy theme. Opens in a floating window with Super + Alt + N. Quick capture from the terminal goes straight to your inbox note.",
+  "features": [
+    "Browse, search and edit notes without leaving the keyboard",
+    "Quick capture: hasky-note buy oat milk",
+    "Notes stay plain markdown in a folder you own",
+    "Follows your current Omarchy theme"
+  ],
+  "built_with": "Rust",
+  "hotkey": "Super + Alt + N",
+  "source": null,
+  "price_sats": null,
+  "lightning_address": null,
+  "status": "listing-draft"
+}

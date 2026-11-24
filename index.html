@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frigg Store Preview</title>
+<meta name="description" content="Frigg is the open market for Omarchy. Developers publish freely and buyers pay them directly in sats.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: the Danish flag as structure. A red field crossed by two white
+   bars set off-centre to the left, with the helmet where they meet. Below the
+   flag the page is plain paper with red used only for what you can act on. */
+:root {
+  --paper: #fbf8f6;
+  --panel: #ffffff;
+  --ink: #1d1416;
+  --muted: #6d5f62;
+  --line: #e6dcdc;
+  --red: #c8102e;
+  --red-deep: #9c0c23;
+  --on-red: #ffffff;
+  --ok: #1f7a4d;
+  --wait: #8a6100;
+  --display: "Fjalla One", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #150e10;
+    --panel: #1f1518;
+    --ink: #f6eeee;
+    --muted: #b3a2a5;
+    --line: #38282c;
+    --red: #e0314c;
+    --red-deep: #b01730;
+    --on-red: #ffffff;
+    --ok: #5fc592;
+    --wait: #e2b54a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #150e10;
+  --panel: #1f1518;
+  --ink: #f6eeee;
+  --muted: #b3a2a5;
+  --line: #38282c;
+  --red: #e0314c;
+  --red-deep: #b01730;
+  --on-red: #ffffff;
+  --ok: #5fc592;
+  --wait: #e2b54a;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.55;
+}
+a { color: var(--red); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; letter-spacing: 0.01em; text-wrap: balance; margin: 0; }
+p { margin: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+/* ---------- flag hero ---------- */
+.flag {
+  position: relative;
+  background: var(--red-deep);
+  background: linear-gradient(160deg, var(--red) 0%, var(--red-deep) 100%);
+  color: var(--on-red);
+  overflow: hidden;
+}
+.flag::before, .flag::after { content: ""; position: absolute; background: #ffffff; opacity: 0.96; }
+.flag::before { left: 0; right: 0; top: 96px; height: 26px; }            /* horizontal bar */
+.flag::after  { top: 0; bottom: 0; left: max(20px, calc(50% - 500px)); width: 26px; margin-left: 78px; } /* vertical bar */
+.flag .wrap { position: relative; z-index: 1; padding-top: 28px; padding-bottom: 56px; }
+.mark { display: flex; align-items: center; gap: 14px; height: 68px; }
+.mark svg { width: 62px; height: 62px; flex: none; margin-left: 60px; position: relative; top: 42px; }
+.flag-body { margin-top: 84px; padding-left: 140px; display: grid; gap: 18px; max-width: 760px; }
+.flag h1 { font-size: clamp(64px, 13vw, 132px); line-height: 0.92; text-transform: uppercase; }
+.lede { font-size: clamp(20px, 2.6vw, 26px); font-family: var(--display); letter-spacing: 0.02em; }
+.sub { max-width: 54ch; opacity: 0.94; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+.btn {
+  display: inline-block; padding: 12px 20px; border-radius: 4px;
+  font: 600 16px/1.2 var(--body); text-decoration: none; cursor: pointer; border: 2px solid #ffffff;
+}
+.btn.solid { background: #ffffff; color: #9c0c23; }
+.btn.ghost { background: transparent; color: #ffffff; }
+.stamp { font: 500 13px/1.4 var(--mono); opacity: 0.9; margin-top: 8px; }
+
+/* ---------- sections ---------- */
+section { padding: 56px 0; border-bottom: 1px solid var(--line); }
+.head { display: grid; gap: 8px; margin-bottom: 26px; max-width: 62ch; }
+.head h2 { font-size: clamp(30px, 4.4vw, 42px); line-height: 1.05; text-transform: uppercase; }
+.head p { color: var(--muted); }
+
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0; border: 1px solid var(--line); background: var(--panel); }
+.rule { padding: 20px; border-left: 4px solid var(--red); display: grid; gap: 6px; align-content: start; }
+.rule + .rule { box-shadow: -1px 0 0 var(--line); }
+.rule h3 { font-size: 21px; text-transform: uppercase; }
+.rule p { color: var(--muted); font-size: 15.5px; }
+
+.apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.app { background: var(--panel); border: 1px solid var(--line); border-top: 5px solid var(--red); padding: 22px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.app-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.app h3 { font-size: 30px; line-height: 1; text-transform: uppercase; }
+.by { color: var(--muted); font-size: 14.5px; }
+.app ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15.5px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { font: 500 12.5px/1 var(--mono); padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); white-space: nowrap; }
+.pill.ok { color: var(--ok); border-color: currentColor; }
+.pill.wait { color: var(--wait); border-color: currentColor; }
+.cmd { display: flex; align-items: stretch; border: 1px solid var(--line); background: var(--paper); min-width: 0; }
+.cmd code { font: 500 14.5px/1.4 var(--mono); padding: 11px 12px; overflow-x: auto; white-space: nowrap; flex: 1; min-width: 0; }
+.cmd button { font: 600 13px/1 var(--body); padding: 0 14px; border: 0; border-left: 1px solid var(--line); background: var(--panel); color: var(--red); cursor: pointer; }
+.note { font-size: 14px; color: var(--muted); }
+
+.steps { counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 22px; padding: 0; margin: 0; list-style: none; }
+.steps li { counter-increment: step; display: grid; gap: 6px; align-content: start; }
+.steps li::before { content: counter(step); font: 400 54px/1 var(--display); color: var(--red); }
+.steps h3 { font-size: 22px; text-transform: uppercase; }
+.steps p { color: var(--muted); font-size: 15.5px; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 26px; align-items: start; }
+.two > * { min-width: 0; }
+pre { margin: 0; overflow-x: auto; background: var(--panel); border: 1px solid var(--line); padding: 16px; font: 400 13.5px/1.55 var(--mono); }
+.stack { display: grid; gap: 14px; }
+.honest { border: 1px solid var(--line); border-left: 4px solid var(--wait); background: var(--panel); padding: 18px 20px; display: grid; gap: 8px; }
+.honest h3 { font-size: 20px; text-transform: uppercase; }
+.honest ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15.5px; color: var(--muted); }
+
+footer { padding: 34px 0 48px; color: var(--muted); font-size: 14.5px; }
+footer .wrap { display: grid; gap: 6px; }
+
+@media (max-width: 640px) {
+  .flag::before { top: 78px; height: 18px; }
+  .flag::after { width: 18px; margin-left: 30px; left: 16px; }
+  .mark svg { width: 48px; height: 48px; margin-left: 15px; top: 34px; }
+  .flag-body { padding-left: 60px; margin-top: 78px; }
+  .btn { padding: 11px 14px; font-size: 15px; }
+  .flag .wrap { padding-bottom: 40px; }
+  section { padding: 40px 0; }
+  .rule + .rule { box-shadow: 0 -1px 0 var(--line); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .cmd button { transition: transform 0.12s ease; }
+  .btn:active, .cmd button:active { transform: translateY(1px); }
+}
+</style>
+</head>
+<body>
+
+<header class="flag">
+  <div class="wrap">
+    <div class="mark" aria-hidden="true">
+      <!-- Frigg mark: a Viking helmet in red and white -->
+      <svg viewBox="0 0 64 64" role="img">
+        <circle cx="32" cy="32" r="31" fill="#ffffff"/>
+        <path d="M13 21c-5-3-7-9-5-15 2 6 6 9 11 10z" fill="#c8102e"/>
+        <path d="M51 21c5-3 7-9 5-15-2 6-6 9-11 10z" fill="#c8102e"/>
+        <path d="M14 40c0-12 8-21 18-21s18 9 18 21z" fill="#c8102e"/>
+        <rect x="11" y="39" width="42" height="6" rx="2" fill="#9c0c23"/>
+        <rect x="29.5" y="19" width="5" height="34" rx="2" fill="#9c0c23"/>
+        <circle cx="21" cy="42" r="1.4" fill="#ffffff"/>
+        <circle cx="43" cy="42" r="1.4" fill="#ffffff"/>
+      </svg>
+    </div>
+    <div class="flag-body">
+      <h1>Frigg</h1>
+      <p class="lede">The open market for Omarchy.</p>
+      <p class="sub">Developers publish what they build. Buyers pay them directly, in sats. Nobody stands in the middle taking a cut or asking for your ID.</p>
+      <div class="actions">
+        <a class="btn solid" href="#apps">Browse apps</a>
+        <a class="btn ghost" href="#sell">Sell on Frigg</a>
+      </div>
+      <p class="stamp">Preview build · 24 November 2026 · not open to the public yet</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <div class="rules">
+        <div class="rule"><h3>No gatekeeper</h3><p>Publish freely. An automated check runs on every submission.</p></div>
+        <div class="rule"><h3>Paid directly</h3><p>Sats go straight to the developer's own Lightning address.</p></div>
+        <div class="rule"><h3>No 30 percent</h3><p>Frigg is free at launch. A small flat fee comes later.</p></div>
+        <div class="rule"><h3>No ID check</h3><p>Buying an app does not need your passport.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="apps">
+    <div class="wrap">
+      <div class="head">
+        <h2>Apps</h2>
+        <p>The first listings. Each card is drawn from a small manifest file the developer controls.</p>
+      </div>
+      <div class="apps" id="app-list">
+        <p class="note">Loading the catalog.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="head">
+        <h2>How buying works</h2>
+        <p>The plan for the first release. Steps two and three are being built this week.</p>
+      </div>
+      <ol class="steps">
+        <li><h3>Find it</h3><p>Open Frigg from the Omarchy menu under Install, or browse here.</p></li>
+        <li><h3>Pay the developer</h3><p>Scan a Lightning invoice. The sats land in the developer's wallet, not ours.</p></li>
+        <li><h3>Install it</h3><p>One command puts the app on your machine, the same way Omarchy installs everything else.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="sell">
+    <div class="wrap">
+      <div class="head">
+        <h2>Sell on Frigg</h2>
+        <p>A listing is one JSON file. You set the price and the Lightning address the money goes to.</p>
+      </div>
+      <div class="two">
+        <pre aria-label="Example manifest">{
+  "id": "your-app",
+  "name": "Your App",
+  "version": "1.0.0",
+  "developer": "You",
+  "tagline": "One line on what it does.",
+  "source": "https://github.com/you/your-app",
+  "price_sats": 21000,
+  "lightning_address": "you@yourwallet.com"
+}</pre>
+        <div class="stack">
+          <div class="honest">
+            <h3>What is true today</h3>
+            <ul>
+              <li>The submission form is not open yet.</li>
+              <li>The automated check will be basic. It is not a security review, so read the source of what you install.</li>
+              <li>Listing is free. The flat fee is not decided.</li>
+            </ul>
+          </div>
+          <p class="note">Frigg puts its row in the Omarchy menu through the user's own extension file, <code>~/.config/omarchy/extensions/omarchy-menu.jsonc</code>, so Omarchy updates leave it alone.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>&copy; 2026 Hasky Labs. All rights reserved. Made by Hasky Labs, Copenhagen.</p>
+    <p>Frigg is an independent project and is not affiliated with Omarchy or 37signals.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var list = document.getElementById("app-list");
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function card(app) {
+    var box = el("article", "app");
+    var top = el("div", "app-top");
+    top.appendChild(el("h3", null, app.name));
+    top.appendChild(el("span", "by", "by " + app.developer));
+    box.appendChild(top);
+
+    if (!app.description) {
+      box.appendChild(el("p", null, "Listed by its developer. The description, price and install details have not been added yet."));
+      var waiting = el("div", "facts");
+      waiting.appendChild(el("span", "pill wait", "awaiting details"));
+      box.appendChild(waiting);
+      return box;
+    }
+
+    box.appendChild(el("p", null, app.description));
+
+    if (app.features && app.features.length) {
+      var ul = el("ul");
+      app.features.forEach(function (f) { ul.appendChild(el("li", null, f)); });
+      box.appendChild(ul);
+    }
+
+    var facts = el("div", "facts");
+    if (app.version) facts.appendChild(el("span", "pill", "v" + app.version));
+    if (app.built_with) facts.appendChild(el("span", "pill", app.built_with));
+    if (app.hotkey) facts.appendChild(el("span", "pill", app.hotkey));
+    facts.appendChild(el("span", app.price_sats ? "pill ok" : "pill wait",
+      app.price_sats ? app.price_sats.toLocaleString("en-GB") + " sats" : "price not set"));
+    box.appendChild(facts);
+
+    var cmd = el("div", "cmd");
+    var code = el("code", null, "frigg install " + app.id);
+    var copy = el("button", null, "Copy");
+    copy.type = "button";
+    copy.addEventListener("click", function () {
+      var done = function (label) { copy.textContent = label; setTimeout(function () { copy.textContent = "Copy"; }, 1600); };
+      try {
+        navigator.clipboard.writeText(code.textContent).then(function () { done("Copied"); }, function () { done("Select it"); });
+      } catch (e) { done("Select it"); }
+    });
+    cmd.appendChild(code);
+    cmd.appendChild(copy);
+    box.appendChild(cmd);
+    box.appendChild(el("p", "note", "The install command is not live yet."));
+    return box;
+  }
+
+  fetch("apps/index.json")
+    .then(function (res) { if (!res.ok) throw new Error(res.status); return res.json(); })
+    .then(function (apps) {
+      list.textContent = "";
+      apps.forEach(function (app) { list.appendChild(card(app)); });
+    })
+    .catch(function () {
+      list.textContent = "";
+      list.appendChild(el("p", "note", "The catalog did not load. Reload the page to try again."));
+    });
+})();
+</script>
+</body>
+</html>

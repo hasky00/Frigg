@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# frigg: command-line client for the Frigg store (draft, untested on Omarchy).
+#
+#   frigg            list the apps in the store
+#   frigg info ID    show one app
+#   frigg install ID install an app (free apps only in this draft)
+#
+# The catalog is a set of small JSON manifests served by the store site.
+set -euo pipefail
+
+FRIGG_URL="${FRIGG_URL:-https://frigg.haskylabs.com}"
+
+need() { command -v "$1" >/dev/null || { echo "frigg needs '$1'. Install it with: omarchy-pkg-add $1" >&2; exit 1; }; }
+need curl
+need jq
+
+catalog() { curl -fsSL "$FRIGG_URL/apps/index.json"; }
+manifest() { curl -fsSL "$FRIGG_URL/apps/$1.json"; }
+
+case "${1:-list}" in
+  list)
+    catalog | jq -r '.[] | "\(.id)\t\(.name)\t\(.tagline // "")"' | column -t -s $'\t'
+    ;;
+  info)
+    [[ -n "${2:-}" ]] || { echo "Usage: frigg info ID" >&2; exit 1; }
+    manifest "$2" | jq -r '"\(.name) \(.version // "")\nby \(.developer)\n\n\(.description // "No description yet.")\n\nPrice: \(if .price_sats then "\(.price_sats) sats" else "not set" end)"'
+    ;;
+  install)
+    [[ -n "${2:-}" ]] || { echo "Usage: frigg install ID" >&2; exit 1; }
+    echo "Installing is not wired up yet. It arrives with the Wednesday build." >&2
+    exit 1
+    ;;
+  *)
+    echo "Usage: frigg [list | info ID | install ID]" >&2
+    exit 1
+    ;;
+esac
